@@ -1,37 +1,49 @@
 var net = require('net')
-  , load = require('git-fs-repo')
   , fs = require('fs')
-  , transport = require('git-transport-protocol')
-  , walk = require('git-walk-refs')
-  , gitclient = require('./index')('git://github.com/chrisdickinson/plate.git')
 
-load('/Users/chris/projects/experiments/plate/.git', function(err, git) {
+var gitclient = require('./index')
+  , transport = require('git-transport-protocol')
+  , load = require('git-fs-repo')
+  , walk = require('git-walk-refs')
+
+// replace this with a path to a repo you've got locally!
+var dir = '/Users/chris/projects/experiments/plate/.git'
+
+load(dir, function(err, git) {
   var refs = git.refs()
     , hashes = refs.map(function(x) { return x.hash })
     , tcp = net.connect({host: 'github.com', port: 9418})
     , client
 
-  client = gitclient(want, walk(find, hashes))
-
-  client.refs.on('data', console.log)
-
-  client
-    .pipe(transport(tcp))
-    .pipe(client)
-
-  client.pack.pipe(fs.createWriteStream('client-output'))
-
-  return
-
-  function find(oid, ready) {
-    return git.find(oid, ready)
-  }
-
+  // given a want(ref, ready) function and a stream
+  // of all of the commits the repo has in reverse
+  // chronological order, we can negotiate a sweet
+  // packfile from the remote!
   function want(ref, ready) {
     if(ref.name === 'refs/heads/master') {
       return ready(true)
     }
     return ready(false)
   }
+  client = gitclient(
+      'git://github.com/chrisdickinson/plate.git'
+    , want
+    , walk(git.find, hashes)
+  )
+ 
+  // output ref data from the remote server! `refs`
+  // is a readable stream. 
+  client.refs.on('data', console.log)
+
+  // pipe client to the transport and back to client.
+  client
+    .pipe(transport(tcp))
+    .pipe(client)
+
+  // when we get packfile data, it'll come out of this
+  // readable stream.
+  client.pack.pipe(fs.createWriteStream('client-output'))
+
+  return
 })
 
