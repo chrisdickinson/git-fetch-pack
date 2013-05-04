@@ -3,6 +3,7 @@ module.exports = client
 var through = require('through')
   , parseref = require('git-packed-ref-parse')
   , emit = require('emit-function')
+  , binary = require('bops')
   , url = require('url')
 
 var _ = 0
@@ -132,7 +133,7 @@ function client(hostinfo, want_function, have_stream, capabilities) {
       return
     }
 
-    refparser.write(packet.data)
+    refparser.write(binary.to(packet.data, 'utf8'))
   }
 
   function on_ref(ref) {

@@ -23,7 +23,8 @@
   "dependencies": {
     "emit-function": "0.0.2",
     "through": "~2.2.7",
-    "git-packed-ref-parse": "0.0.0"
+    "git-packed-ref-parse": "0.0.0",
+    "bops": "0.0.2"
   },
   "devDependencies": {
     "git-fs-repo": "0.0.1",
