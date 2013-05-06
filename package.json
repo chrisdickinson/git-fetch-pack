@@ -24,11 +24,11 @@
     "emit-function": "0.0.2",
     "through": "~2.2.7",
     "git-packed-ref-parse": "0.0.0",
-    "bops": "0.0.2"
+    "bops": "0.0.3"
   },
   "devDependencies": {
     "git-fs-repo": "0.0.1",
-    "git-transport-protocol": "0.0.4",
+    "git-transport-protocol": "0.0.5",
     "git-walk-refs": "0.0.1"
   }
 }
