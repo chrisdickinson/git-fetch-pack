@@ -1,6 +1,6 @@
 {
   "name": "git-fetch-pack",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "git's smart fetch-pack protocol",
   "main": "index.js",
   "scripts": {
