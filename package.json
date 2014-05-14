@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "git-fs-repo": "0.0.1",
-    "git-transport-protocol": "0.0.5",
+    "git-transport-protocol": "0.1.0",
     "git-walk-refs": "0.0.1"
   }
 }
