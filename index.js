@@ -19,13 +19,15 @@ var _ = 0
 
 function client(hostinfo, want_function, have_stream, capabilities) {
   hostinfo = typeof hostinfo === 'string' ? url.parse(hostinfo) : hostinfo || {}
-  capabilities = capabilities || ['thin-pack', 'include-tag', 'ofs-delta', 'multi_ack_detailed']
+  capabilities = capabilities || ['thin-pack', 'include-tag', 'side-band-64k', 'multi_ack_detailed', 'ofs-delta']
   have_stream = have_stream || none_stream()
   want_function = want_function || function(ref, ready) { return ready(false) }
 
 
   var stream = through(recv, end)
     , packstream = through(writepack)
+    , progress = through(sideband)
+    , error = through(sideband)
     , refparser = parseref()
     , refstream = through()
     , state = STATE_ADVERTISE
@@ -46,7 +48,10 @@ function client(hostinfo, want_function, have_stream, capabilities) {
     .on('data', gothave)
     .on('end', function() {
       state = STATE_SENDPACK
-      write('done')
+      write({
+          type: 'pkt-line'
+        , data: 'done'
+      })
     })
 
   refparser
@@ -54,6 +59,8 @@ function client(hostinfo, want_function, have_stream, capabilities) {
     .on('error', emit(stream, 'error'))
 
   stream.pack = packstream
+  stream.progress = progress
+  stream.error = error
   stream.refs = refstream
   process.nextTick(start)
 
@@ -64,20 +71,27 @@ function client(hostinfo, want_function, have_stream, capabilities) {
       return stream.once('drain', start)
     }
 
-    stream.queue(
-      'git-upload-pack '+hostinfo.pathname+'\0host='+hostinfo.hostname+'\0'
-    )
+    stream.queue({
+        type: 'pkt-line'
+      , data:
+          'git-upload-pack '+
+          hostinfo.pathname+
+          '\0host='+hostinfo.hostname+'\0'
+    })
   }
 
   function gothave(commit) {
-    write('have '+commit.hash)
+    write({
+        type: 'pkt-line'
+      , data: 'have '+commit.hash
+    })
     ++wrotehave
     if(wrotehave % 16 === 0) {
-      write('')
+      write({type: 'pkt-flush'})
     } 
 
     if(wrotehave === 256) {
-      write('')
+      write({type: 'pkt-flush'})
       have_stream.end()
     }
   }
@@ -89,10 +103,21 @@ function client(hostinfo, want_function, have_stream, capabilities) {
     packstream.queue(packet.data)
   }
 
+  function sideband(packet) {
+    this.queue(packet.data)
+  }
+
   function write(what) {
-    if(negotiated && !sent_caps) {
-      what += '\0'+negotiated.join(' ')
+    if(negotiated && !sent_caps && what.type === 'pkt-line') {
+      what.data += ' '+negotiated.join(' ')
+      console.log(what.data)
       sent_caps = true
+    }
+    if(what.type === 'pkt-line') {
+      what.data += '\n'
+    }
+    if(what.data) {
+      what.data = binary.from(what.data, 'utf8')
     }
     stream.queue(what)
   }
@@ -116,7 +141,11 @@ function client(hostinfo, want_function, have_stream, capabilities) {
     }
 
     if(state === STATE_SENDPACK) {
-      packstream.write(packet)
+      var to = packet.type === 'packfile' ? packstream :
+               packet.type === 'error' ? error :
+               packet.type === 'progress' ? progress : through()
+
+      to.write(packet)
     }
   }
 
@@ -154,10 +183,15 @@ function client(hostinfo, want_function, have_stream, capabilities) {
     state = STATE_ACKNAK
 
     for(var i = 0, len = wants.length; i < len; ++i) {
-      write('want '+wants[i].hash)
+      write({
+          type: 'pkt-line'
+        , data: 'want '+wants[i].hash
+      })
     }
 
-    write('')
+    write({
+      type: 'pkt-flush'
+    })
 
     have_stream.resume()
   }
